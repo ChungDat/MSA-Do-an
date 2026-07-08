@@ -4,7 +4,7 @@ Tiến độ thực hiện các tính năng của ứng dụng Phân Tích Nhân
 
 - `[x]` **Setup môi trường**
   - `[x]` Tạo file `requirements.txt`.
-  - `[x]` Tạo file `.env.example`.
+  - `[x]` Tạo file cấu hình `.env`.
 - `[x]` **Xây dựng Logic Cốt lõi (Core Logic)**
   - `[x]` Code `data_processor.py` (Đọc dữ liệu, kiểm tra lỗi missing, chuẩn hóa).
   - `[x]` Code `factor_analysis.py` (Chạy FA, xoay trục, lọc hệ số tải, phân cụm đặc trưng).

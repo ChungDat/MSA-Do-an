@@ -1,58 +1,62 @@
-import pandas as pd
-import numpy as np
+import inspect
+
+import factor_analyzer.factor_analyzer as factor_analyzer_module
 from factor_analyzer import FactorAnalyzer
+from sklearn.utils import validation as sklearn_validation
 
-def determine_num_factors(df):
-    """
-    Determine the number of factors based on Kaiser criterion (Eigenvalue > 1).
-    """
-    fa = FactorAnalyzer(n_factors=df.shape[1], rotation=None)
-    fa.fit(df)
-    ev, _ = fa.get_eigenvalues()
-    num_factors = sum(ev > 1)
-    if num_factors == 0:
-        return 1 # Fallback if no eigenvalue is > 1
-    return num_factors
 
-def perform_factor_analysis(df, feature_names, n_factors=None, threshold=0.4, rotation='varimax', method='minres'):
-    """
-    Perform Factor Analysis and return groupings of features.
-    
-    Args:
-        df (pd.DataFrame): The standardized data.
-        feature_names (list): List of feature names.
-        n_factors (int): Number of factors to extract. If None, uses Eigenvalue > 1.
-        threshold (float): Factor loading threshold.
-        rotation (str): Rotation method (e.g., 'varimax', 'promax').
-        method (str): Extraction method (e.g., 'minres', 'ml').
-        
-    Returns:
-        tuple: (factor_groupings, n_factors)
-               factor_groupings is a dict where keys are factor indices (e.g., "Factor_1") 
-               and values are lists of dicts containing feature names and their loadings.
-    """
+# factor-analyzer 0.5.1 still passes the old keyword removed by newer sklearn.
+if "force_all_finite" not in inspect.signature(sklearn_validation.check_array).parameters:
+    _check_array = sklearn_validation.check_array
+
+    def _check_array_compat(
+        *args, force_all_finite=True, ensure_all_finite=None, **kwargs
+    ):
+        if ensure_all_finite is None:
+            ensure_all_finite = force_all_finite
+        return _check_array(
+            *args, ensure_all_finite=ensure_all_finite, **kwargs
+        )
+
+    sklearn_validation.check_array = _check_array_compat
+    factor_analyzer_module.check_array = _check_array_compat
+
+
+def determine_num_factors(dataframe):
+    """Xác định số nhân tố theo tiêu chuẩn Kaiser (eigenvalue > 1)."""
+    analyzer = FactorAnalyzer(n_factors=dataframe.shape[1], rotation=None)
+    analyzer.fit(dataframe)
+    eigenvalues, _ = analyzer.get_eigenvalues()
+    return max(1, int(sum(eigenvalues > 1)))
+
+
+def perform_factor_analysis(
+    dataframe,
+    feature_names,
+    n_factors=None,
+    threshold=0.4,
+    rotation="varimax",
+    method="minres",
+):
+    """Phân tích nhân tố và nhóm các biến vượt ngưỡng hệ số tải."""
     if n_factors is None or n_factors <= 0:
-        n_factors = determine_num_factors(df)
-        
-    fa = FactorAnalyzer(n_factors=n_factors, rotation=rotation, method=method)
-    fa.fit(df)
-    
-    loadings = fa.loadings_
-    
+        n_factors = determine_num_factors(dataframe)
+
+    analyzer = FactorAnalyzer(
+        n_factors=n_factors, rotation=rotation, method=method
+    )
+    analyzer.fit(dataframe)
+
     factor_groupings = {}
-    for i in range(n_factors):
-        factor_name = f"Factor_{i+1}"
-        factor_groupings[factor_name] = []
-        
-        for j in range(len(feature_names)):
-            loading = loadings[j, i]
-            if abs(loading) >= threshold:
-                factor_groupings[factor_name].append({
-                    "feature": feature_names[j],
-                    "loading": float(loading)
-                })
-                
-        # Sort by absolute loading in descending order
-        factor_groupings[factor_name].sort(key=lambda x: abs(x["loading"]), reverse=True)
-        
+    for factor_index in range(n_factors):
+        factor_name = f"Factor_{factor_index + 1}"
+        features = [
+            {"feature": feature, "loading": float(analyzer.loadings_[index, factor_index])}
+            for index, feature in enumerate(feature_names)
+            if abs(analyzer.loadings_[index, factor_index]) >= threshold
+        ]
+        factor_groupings[factor_name] = sorted(
+            features, key=lambda item: abs(item["loading"]), reverse=True
+        )
+
     return factor_groupings, n_factors

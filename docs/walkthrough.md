@@ -1,12 +1,12 @@
 # Tổng kết: Ứng dụng Phân Tích Nhân Tố (Factor Analysis) kết hợp LLM
 
-Quá trình xây dựng ứng dụng theo đặc tả `SPEC.md` đã hoàn tất. Dưới đây là các thành phần chính đã được triển khai:
+Quá trình xây dựng ứng dụng theo đặc tả `docs/SPEC.md` đã hoàn tất. Dưới đây là các thành phần chính đã được triển khai:
 
 ## 1. Các tệp đã được tạo
 
 - **Môi trường**: 
-  - `requirements.txt`: Chứa danh sách các thư viện cần thiết (`pandas`, `scikit-learn`, `factor_analyzer`, `requests`, v.v.).
-  - `.env.example`: File mẫu chứa cấu hình kết nối đến Ollama API.
+  - `requirements.txt` ở thư mục gốc: Chứa danh sách các thư viện cần thiết (`pandas`, `scikit-learn`, `factor_analyzer`, `requests`, v.v.).
+  - `.env`: File cấu hình cục bộ chứa thiết lập kết nối đến Ollama API.
 - **Logic Cốt lõi**:
   - `data_processor.py`: Đọc dữ liệu CSV, xử lý ngoại lệ khi thiếu dữ liệu (missing values) và chuẩn hóa dữ liệu.
   - `factor_analysis.py`: Áp dụng thuật toán Factor Analysis. Tự động tính toán số lượng nhân tố (nếu cần) bằng Eigenvalue > 1. Lọc các thuộc tính theo ngưỡng tải.
@@ -19,12 +19,12 @@ Quá trình xây dựng ứng dụng theo đặc tả `SPEC.md` đã hoàn tất
 
 ### 2.1 Cài đặt
 1. Cài đặt các thư viện: `pip install -r requirements.txt`
-2. Đổi tên `.env.example` thành `.env` (hoặc tạo file mới) và cấu hình `OLLAMA_ENDPOINT` / `OLLAMA_MODEL` nếu cần thiết (mặc định là llama3).
+2. Cấu hình `OLLAMA_ENDPOINT` / `OLLAMA_MODEL` trong `.env` nếu cần thiết (mặc định là llama3).
 
 ### 2.2 Chạy ứng dụng qua CLI
 Bạn có thể chạy thử lệnh sau để hiểu cách hoạt động:
 ```bash
-python main_cli.py path/to/your/data.csv -f 0 -t 0.4 -r varimax -o my_results.json
+python -m src.main_cli path/to/your/data.csv -f 0 -t 0.4 -r varimax -o my_results.json
 ```
 Trong đó:
 - `-f 0`: Tự động tìm số nhân tố.
@@ -34,7 +34,7 @@ Trong đó:
 ### 2.3 Chạy ứng dụng qua GUI
 Chỉ cần gọi lệnh:
 ```bash
-python main_gui.py
+python -m src.main_gui
 ```
 Cửa sổ sẽ hiện lên. Bạn chọn tệp CSV, chỉnh sửa các tham số và bấm "Chạy phân tích". Kết quả phân tích sẽ được in trực tiếp lên cửa sổ dưới dạng văn bản và có thể lưu lại thông qua nút bấm "Lưu Kết Quả (JSON)".
 
