@@ -1,7 +1,8 @@
 # Ứng dụng phân tích nhân tố
 
 Ứng dụng đọc dữ liệu CSV, thực hiện Factor Analysis và dùng Ollama để gợi ý tên
-cho các nhân tố tiềm ẩn.
+cho các nhân tố tiềm ẩn. Giao diện cũng cung cấp tab thống kê mô tả để tính min,
+max, mean, phương sai mẫu và ma trận hiệp phương sai.
 
 ## Cấu trúc
 
