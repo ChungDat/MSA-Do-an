@@ -3,11 +3,19 @@ import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
+
 from .data_processor import (
     calculate_descriptive_statistics,
     load_and_preprocess_data,
 )
-from .factor_analysis import calculate_eigenvalues, perform_factor_analysis
+from .factor_analysis import (
+    calculate_eigenvalues,
+    determine_scree_elbow,
+    parallel_analysis,
+    perform_factor_analysis,
+)
 from .llm_namer import name_all_factors
 
 
@@ -18,6 +26,7 @@ class FactorAnalysisApp:
         self.statistics_file_path = None
         self.result_data = None
         self.analysis_metadata = None
+        self.factor_count_file_path = None
 
         root.title("Ứng dụng phân tích dữ liệu")
         root.geometry("900x650")
@@ -29,11 +38,14 @@ class FactorAnalysisApp:
 
         self.factor_tab = ttk.Frame(notebook, padding=5)
         self.statistics_tab = ttk.Frame(notebook, padding=5)
+        self.factor_count_tab = ttk.Frame(notebook, padding=5)
         notebook.add(self.factor_tab, text="Phân tích nhân tố")
         notebook.add(self.statistics_tab, text="Thống kê mô tả")
+        notebook.add(self.factor_count_tab, text="Xác định số nhân tố")
 
         self._setup_factor_tab()
         self._setup_statistics_tab()
+        self._setup_factor_count_tab()
 
     def _setup_factor_tab(self):
         config = ttk.LabelFrame(self.factor_tab, text="Cấu hình", padding=10)
@@ -125,6 +137,37 @@ class FactorAnalysisApp:
         vertical_scroll.grid(row=0, column=1, sticky="ns")
         horizontal_scroll.grid(row=1, column=0, sticky="ew")
 
+    def _setup_factor_count_tab(self):
+        controls = ttk.LabelFrame(
+            self.factor_count_tab, text="Dữ liệu đầu vào", padding=10
+        )
+        controls.pack(fill=tk.X, padx=5, pady=5)
+        ttk.Button(
+            controls, text="Chọn file CSV", command=self.select_factor_count_file
+        ).grid(row=0, column=0, padx=5, pady=5)
+        self.factor_count_file_label = ttk.Label(controls, text="Chưa chọn file")
+        self.factor_count_file_label.grid(row=0, column=1, sticky=tk.W)
+        controls.columnconfigure(1, weight=1)
+        self.factor_count_button = ttk.Button(
+            controls, text="Xác định số nhân tố", command=self.run_factor_count
+        )
+        self.factor_count_button.grid(row=1, column=0, columnspan=2, pady=8)
+
+        content = ttk.Panedwindow(self.factor_count_tab, orient=tk.HORIZONTAL)
+        content.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        text_frame = ttk.LabelFrame(content, text="Kết luận", padding=8)
+        plot_frame = ttk.LabelFrame(content, text="Scree Plot", padding=8)
+        content.add(text_frame, weight=1)
+        content.add(plot_frame, weight=1)
+        self.factor_count_text = tk.Text(text_frame, wrap=tk.WORD, width=48)
+        self.factor_count_text.pack(fill=tk.BOTH, expand=True)
+
+        self.scree_figure = Figure(figsize=(5, 4), dpi=100)
+        self.scree_axis = self.scree_figure.add_subplot(111)
+        self.scree_canvas = FigureCanvasTkAgg(self.scree_figure, master=plot_frame)
+        self.scree_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        self._draw_scree([])
+
     def select_file(self):
         path = self._ask_for_csv()
         if path:
@@ -136,6 +179,12 @@ class FactorAnalysisApp:
         if path:
             self.statistics_file_path = path
             self.statistics_file_label.config(text=path)
+
+    def select_factor_count_file(self):
+        path = self._ask_for_csv()
+        if path:
+            self.factor_count_file_path = path
+            self.factor_count_file_label.config(text=path)
 
     @staticmethod
     def _ask_for_csv():
@@ -197,6 +246,93 @@ class FactorAnalysisApp:
         self.statistics_text.delete("1.0", tk.END)
         self.statistics_text.insert(tk.END, "Calculating...")
         threading.Thread(target=self._calculate_statistics, daemon=True).start()
+
+    def run_factor_count(self):
+        if not self.factor_count_file_path:
+            messagebox.showerror("Lỗi", "Vui lòng chọn một file CSV.")
+            return
+        self.factor_count_button.config(state=tk.DISABLED)
+        self.factor_count_text.delete("1.0", tk.END)
+        self.factor_count_text.insert(tk.END, "Đang tính toán...")
+        threading.Thread(target=self._calculate_factor_count, daemon=True).start()
+
+    def _calculate_factor_count(self):
+        try:
+            dataframe, _ = load_and_preprocess_data(self.factor_count_file_path)
+            eigenvalues = calculate_eigenvalues(dataframe)
+            kaiser_m = max(1, int(sum(value > 1 for value in eigenvalues)))
+            scree_m = determine_scree_elbow(eigenvalues)
+            parallel_m, thresholds = parallel_analysis(dataframe)
+            self.root.after(
+                0,
+                lambda: self._show_factor_count(
+                    eigenvalues, kaiser_m, scree_m, parallel_m, thresholds
+                ),
+            )
+        except Exception as exc:
+            error = str(exc)
+            self.root.after(0, lambda: messagebox.showerror("Lỗi", error))
+        finally:
+            self.root.after(
+                0, lambda: self.factor_count_button.config(state=tk.NORMAL)
+            )
+
+    def _show_factor_count(
+        self, eigenvalues, kaiser_m, scree_m, parallel_m, thresholds
+    ):
+        output = (
+            "1. QUY TẮC KAISER\n"
+            f"Đề xuất: m = {kaiser_m}.\n"
+            "Lý do: giữ các nhân tố có trị riêng > 1, nghĩa là mỗi nhân tố "
+            "giải thích nhiều phương sai hơn một biến đã chuẩn hóa.\n"
+            "Mức ý nghĩa: không áp dụng; đây là quy tắc quyết định, không phải "
+            "kiểm định giả thuyết.\n\n"
+            "2. SCREE PLOT\n"
+            f"Đề xuất: m = {scree_m}.\n"
+            "Lý do: điểm khuỷu được ước lượng bằng khoảng cách lớn nhất tới "
+            "đường nối hai đầu dãy trị riêng; sau đó là phần đuôi tương đối phẳng.\n"
+            "Mức ý nghĩa: không áp dụng; Scree Plot là phương pháp hình học/"
+            "khám phá. Hãy đối chiếu điểm đánh dấu trên đồ thị.\n\n"
+            "3. PARALLEL ANALYSIS (HORN)\n"
+            f"Đề xuất: m = {parallel_m}.\n"
+            "Lý do: giữ các trị riêng quan sát lớn hơn phân vị 95% của trị "
+            "riêng từ 200 bộ dữ liệu ngẫu nhiên có cùng kích thước.\n"
+            "Mức ý nghĩa: α = 0,05; chỉ khoảng 5% trị riêng ngẫu nhiên vượt "
+            "ngưỡng. Đây là khuyến nghị chính vì có chuẩn đối chứng ngẫu nhiên."
+        )
+        self.factor_count_text.delete("1.0", tk.END)
+        self.factor_count_text.insert(tk.END, output)
+        self._draw_scree(eigenvalues, scree_m, thresholds)
+
+    def _draw_scree(self, eigenvalues, selected_m=None, thresholds=None):
+        self.scree_axis.clear()
+        if len(eigenvalues):
+            factors = list(range(1, len(eigenvalues) + 1))
+            self.scree_axis.plot(
+                factors, eigenvalues, marker="o", label="Trị riêng quan sát"
+            )
+            self.scree_axis.axhline(
+                1, color="gray", linestyle="--", label="Kaiser = 1"
+            )
+            if thresholds is not None:
+                self.scree_axis.plot(
+                    factors, thresholds, linestyle="--", label="Ngưỡng PA 95%"
+                )
+            if selected_m:
+                self.scree_axis.axvline(
+                    selected_m,
+                    color="red",
+                    linestyle=":",
+                    label=f"Điểm khuỷu m={selected_m}",
+                )
+            self.scree_axis.set_xticks(factors)
+            self.scree_axis.legend(fontsize=8)
+        self.scree_axis.set_title("Biểu đồ Scree Plot")
+        self.scree_axis.set_xlabel("Số thứ tự nhân tố")
+        self.scree_axis.set_ylabel("Trị riêng")
+        self.scree_axis.grid(alpha=0.25)
+        self.scree_figure.tight_layout()
+        self.scree_canvas.draw()
 
     def _calculate_statistics(self):
         try:

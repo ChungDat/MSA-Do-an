@@ -47,6 +47,36 @@ def determine_num_factors(dataframe):
     return selected_count
 
 
+def determine_scree_elbow(eigenvalues):
+    """Estimate the scree-plot elbow by maximum distance from the end-point line."""
+    values = np.asarray(eigenvalues, dtype=float)
+    if values.size < 3:
+        return max(1, values.size)
+    x = np.arange(1, values.size + 1, dtype=float)
+    start = np.array([x[0], values[0]])
+    line = np.array([x[-1], values[-1]]) - start
+    distances = np.abs(
+        line[0] * (start[1] - values) - (start[0] - x) * line[1]
+    ) / np.linalg.norm(line)
+    return max(1, int(np.argmax(distances)) + 1)
+
+
+def parallel_analysis(dataframe, iterations=200, percentile=95, random_state=42):
+    """Run Horn parallel analysis against random normal data."""
+    if iterations < 1:
+        raise ValueError("Parallel analysis iterations must be positive.")
+    rows, columns = dataframe.shape
+    rng = np.random.default_rng(random_state)
+    random_eigenvalues = np.empty((iterations, columns))
+    for index in range(iterations):
+        random_data = rng.standard_normal((rows, columns))
+        correlation = np.corrcoef(random_data, rowvar=False)
+        random_eigenvalues[index] = np.linalg.eigvalsh(correlation)[::-1]
+    observed = calculate_eigenvalues(dataframe)
+    thresholds = np.percentile(random_eigenvalues, percentile, axis=0)
+    return max(1, int(np.sum(observed > thresholds))), thresholds
+
+
 def perform_factor_analysis(
     dataframe,
     feature_names,
