@@ -16,6 +16,8 @@ wheels/
 images/
 
 .agent
+.agents
 .github
 
 tests/
+.env
