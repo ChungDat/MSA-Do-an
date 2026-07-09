@@ -1,6 +1,7 @@
 import inspect
 
 import factor_analyzer.factor_analyzer as factor_analyzer_module
+import numpy as np
 from factor_analyzer import FactorAnalyzer
 from sklearn.utils import validation as sklearn_validation
 
@@ -22,12 +23,28 @@ if "force_all_finite" not in inspect.signature(sklearn_validation.check_array).p
     factor_analyzer_module.check_array = _check_array_compat
 
 
+def calculate_eigenvalues(dataframe):
+    """Tính trị riêng của ma trận tương quan theo thứ tự giảm dần."""
+    correlation = dataframe.corr().to_numpy()
+    if not np.isfinite(correlation).all():
+        raise ValueError(
+            "Unable to calculate eigenvalues because the data contains "
+            "a column with no variance."
+        )
+    eigenvalues = np.linalg.eigvalsh(correlation)[::-1]
+    return np.where(np.abs(eigenvalues) < 1e-12, 0.0, eigenvalues)
+
+
 def determine_num_factors(dataframe):
-    """Xác định số nhân tố theo tiêu chuẩn Kaiser (eigenvalue > 1)."""
-    analyzer = FactorAnalyzer(n_factors=dataframe.shape[1], rotation=None)
-    analyzer.fit(dataframe)
-    eigenvalues, _ = analyzer.get_eigenvalues()
-    return max(1, int(sum(eigenvalues > 1)))
+    """Chọn toàn bộ nhân tố có trị riêng lớn hơn 1 (tiêu chuẩn Kaiser)."""
+    eigenvalues = calculate_eigenvalues(dataframe)
+    selected_count = int(sum(eigenvalue > 1 for eigenvalue in eigenvalues))
+    if selected_count == 0:
+        raise ValueError(
+            "No eigenvalue is greater than 1, so the Kaiser criterion "
+            "cannot select a factor. Please enter the number of factors manually."
+        )
+    return selected_count
 
 
 def perform_factor_analysis(
@@ -41,9 +58,19 @@ def perform_factor_analysis(
     """Phân tích nhân tố và nhóm các biến vượt ngưỡng hệ số tải."""
     if n_factors is None or n_factors <= 0:
         n_factors = determine_num_factors(dataframe)
+    if n_factors > dataframe.shape[1]:
+        raise ValueError(
+            f"The number of factors ({n_factors}) cannot exceed the number "
+            f"of variables ({dataframe.shape[1]})."
+        )
+    if not 0 <= threshold <= 1:
+        raise ValueError("The loading threshold must be between 0 and 1.")
 
     analyzer = FactorAnalyzer(
-        n_factors=n_factors, rotation=rotation, method=method
+        n_factors=n_factors,
+        rotation=rotation,
+        method=method,
+        use_smc=False,
     )
     analyzer.fit(dataframe)
 

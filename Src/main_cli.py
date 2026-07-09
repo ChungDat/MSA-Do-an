@@ -30,12 +30,12 @@ def main():
         args.rotation,
         args.method,
     )
-    print(f"Đã trích xuất {extracted} nhân tố.")
+    print(f"Extracted {extracted} factors.")
     results = name_all_factors(factor_groupings)
 
     with open(args.output, "w", encoding="utf-8") as output_file:
         json.dump(results, output_file, ensure_ascii=False, indent=4)
-    print(f"Đã lưu kết quả vào: {args.output}")
+    print(f"Saved results to: {args.output}")
 
 
 if __name__ == "__main__":

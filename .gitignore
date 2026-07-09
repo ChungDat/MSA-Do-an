@@ -17,3 +17,5 @@ images/
 
 .agent
 .github
+
+tests/

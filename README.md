@@ -4,6 +4,10 @@
 cho các nhân tố tiềm ẩn. Giao diện cũng cung cấp tab thống kê mô tả để tính min,
 max, mean, phương sai mẫu và ma trận hiệp phương sai.
 
+Khi ô **Số nhân tố** để trống, chương trình áp dụng tiêu chuẩn Kaiser và chọn tất
+cả nhân tố có trị riêng lớn hơn 1. Các trị riêng và số nhân tố được chọn được
+hiển thị ở đầu kết quả.
+
 ## Cấu trúc
 
 ```text

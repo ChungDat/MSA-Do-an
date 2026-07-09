@@ -55,7 +55,7 @@ def name_factor_with_llm(features):
             "explanation": result.get("explanation", "No explanation provided."),
         }
     except Exception as exc:
-        print(f"Lỗi khi gọi LLM: {exc}")
+        print(f"Error while calling the LLM: {exc}")
         return {
             "factor_name": "LLM_Error_Factor",
             "explanation": f"Failed to get name from LLM. Error: {exc}",
@@ -66,8 +66,8 @@ def name_all_factors(factor_groupings):
     named_factors = {}
     for original_name, features in factor_groupings.items():
         print(
-            f"Đang phân tích ngữ nghĩa cho {original_name} "
-            f"với {len(features)} thuộc tính..."
+            f"Analyzing the semantics of {original_name} "
+            f"with {len(features)} features..."
         )
         llm_result = name_factor_with_llm(features)
         named_factors[original_name] = {

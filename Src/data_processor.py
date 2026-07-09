@@ -7,22 +7,22 @@ def load_numeric_data(file_path):
     try:
         dataframe = pd.read_csv(file_path)
     except Exception as exc:
-        raise ValueError(f"Không thể đọc file {file_path}. Lỗi: {exc}") from exc
+        raise ValueError(f"Unable to read file {file_path}. Error: {exc}") from exc
 
     if dataframe.empty:
-        raise ValueError("File CSV không chứa dữ liệu.")
+        raise ValueError("The CSV file does not contain any data.")
 
     if dataframe.isnull().values.any():
         raise ValueError(
-            "Dữ liệu chứa giá trị thiếu (Missing values/NaN). "
-            "Vui lòng làm sạch dữ liệu trước khi tiếp tục."
+            "The data contains missing values (NaN). "
+            "Please clean the data before continuing."
         )
 
     non_numeric_columns = dataframe.select_dtypes(exclude=["number"]).columns
     if len(non_numeric_columns) > 0:
         raise ValueError(
-            f"Dữ liệu chứa các cột không phải số: {list(non_numeric_columns)}. "
-            "Cần chuyển đổi thành số trước."
+            f"The data contains non-numeric columns: {list(non_numeric_columns)}. "
+            "Please convert them to numbers before continuing."
         )
 
     return dataframe

@@ -7,7 +7,7 @@ from .data_processor import (
     calculate_descriptive_statistics,
     load_and_preprocess_data,
 )
-from .factor_analysis import perform_factor_analysis
+from .factor_analysis import calculate_eigenvalues, perform_factor_analysis
 from .llm_namer import name_all_factors
 
 
@@ -17,6 +17,7 @@ class FactorAnalysisApp:
         self.file_path = None
         self.statistics_file_path = None
         self.result_data = None
+        self.analysis_metadata = None
 
         root.title("Ứng dụng phân tích dữ liệu")
         root.geometry("900x650")
@@ -46,6 +47,10 @@ class FactorAnalysisApp:
         ttk.Label(config, text="Số nhân tố:").grid(row=1, column=0, sticky=tk.E)
         self.factors_entry = ttk.Entry(config, width=10)
         self.factors_entry.grid(row=1, column=1, sticky=tk.W, padx=5)
+        ttk.Label(
+            config,
+            text="Để trống: tự chọn tất cả trị riêng > 1 (Kaiser)",
+        ).grid(row=1, column=2, columnspan=2, sticky=tk.W)
         ttk.Label(config, text="Ngưỡng tải:").grid(row=2, column=0, sticky=tk.E)
         self.threshold_entry = ttk.Entry(config, width=10)
         self.threshold_entry.insert(0, "0.4")
@@ -135,19 +140,23 @@ class FactorAnalysisApp:
     @staticmethod
     def _ask_for_csv():
         return filedialog.askopenfilename(
-            title="Chọn dữ liệu", filetypes=[("CSV files", "*.csv")]
+            title="Select data", filetypes=[("CSV files", "*.csv")]
         )
 
     def run_analysis(self):
         if not self.file_path:
-            messagebox.showerror("Lỗi", "Vui lòng chọn file CSV.")
+            messagebox.showerror("Error", "Please select a CSV file.")
             return
         try:
             threshold = float(self.threshold_entry.get())
             value = self.factors_entry.get().strip()
             factors = int(value) if value else None
         except ValueError:
-            messagebox.showerror("Lỗi", "Tham số không hợp lệ.")
+            messagebox.showerror(
+                "Error",
+                "Invalid parameters. Enter a whole number of factors "
+                "and a numeric loading threshold.",
+            )
             return
 
         self.run_button.config(state=tk.DISABLED)
@@ -158,15 +167,21 @@ class FactorAnalysisApp:
     def _analyze(self, factors, threshold):
         try:
             dataframe, names = load_and_preprocess_data(self.file_path)
-            groups, _ = perform_factor_analysis(
+            eigenvalues = calculate_eigenvalues(dataframe)
+            groups, extracted = perform_factor_analysis(
                 dataframe, names, factors, threshold
             )
+            self.analysis_metadata = {
+                "automatic": factors is None,
+                "extracted": extracted,
+                "eigenvalues": eigenvalues.tolist(),
+            }
             self.result_data = name_all_factors(groups)
             self.root.after(0, self._display_results)
         except Exception as exc:
             error = str(exc)
             self.root.after(
-                0, lambda: messagebox.showerror("Lỗi", error)
+                0, lambda: messagebox.showerror("Error", error)
             )
         finally:
             self.root.after(
@@ -175,12 +190,12 @@ class FactorAnalysisApp:
 
     def run_statistics(self):
         if not self.statistics_file_path:
-            messagebox.showerror("Lỗi", "Vui lòng chọn file CSV.")
+            messagebox.showerror("Error", "Please select a CSV file.")
             return
 
         self.statistics_button.config(state=tk.DISABLED)
         self.statistics_text.delete("1.0", tk.END)
-        self.statistics_text.insert(tk.END, "Đang tính toán...")
+        self.statistics_text.insert(tk.END, "Calculating...")
         threading.Thread(target=self._calculate_statistics, daemon=True).start()
 
     def _calculate_statistics(self):
@@ -189,18 +204,18 @@ class FactorAnalysisApp:
                 self.statistics_file_path
             )
             output = (
-                "CÁC ĐẠI LƯỢNG ĐẶC TRƯNG\n"
-                "========================\n"
+                "DESCRIPTIVE STATISTICS\n"
+                "======================\n"
                 f"{summary.to_string(float_format=lambda x: f'{x:.6f}')}\n\n"
-                "MA TRẬN HIỆP PHƯƠNG SAI MẪU\n"
-                "============================\n"
+                "SAMPLE COVARIANCE MATRIX\n"
+                "========================\n"
                 f"{covariance.to_string(float_format=lambda x: f'{x:.6f}')}"
             )
             self.root.after(0, lambda: self._show_statistics(output))
         except Exception as exc:
             error = str(exc)
             self.root.after(
-                0, lambda: messagebox.showerror("Lỗi", error)
+                0, lambda: messagebox.showerror("Error", error)
             )
         finally:
             self.root.after(
@@ -213,6 +228,17 @@ class FactorAnalysisApp:
 
     def _display_results(self):
         self.result_text.delete("1.0", tk.END)
+        metadata = self.analysis_metadata or {}
+        if metadata.get("automatic"):
+            eigenvalues = metadata.get("eigenvalues", [])
+            selected = [value for value in eigenvalues if value > 1]
+            self.result_text.insert(
+                tk.END,
+                "AUTOMATIC SELECTION USING THE KAISER CRITERION\n"
+                f"Eigenvalues: {', '.join(f'{value:.4f}' for value in eigenvalues)}\n"
+                f"Eigenvalues > 1: {', '.join(f'{value:.4f}' for value in selected)}\n"
+                f"Selected factors: {metadata.get('extracted', 1)}\n\n",
+            )
         for factor, data in self.result_data.items():
             self.result_text.insert(
                 tk.END,
@@ -225,6 +251,10 @@ class FactorAnalysisApp:
                 + "\n\n",
             )
         self.save_button.config(state=tk.NORMAL)
+        messagebox.showinfo(
+            "Analysis Complete",
+            "Analysis completed successfully.",
+        )
 
     def save_result(self):
         path = filedialog.asksaveasfilename(
@@ -235,6 +265,10 @@ class FactorAnalysisApp:
                 json.dump(
                     self.result_data, output_file, ensure_ascii=False, indent=4
                 )
+            messagebox.showinfo(
+                "Save Complete",
+                "The analysis result was saved successfully.",
+            )
 
 
 def main():
