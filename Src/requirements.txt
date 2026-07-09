@@ -1,6 +1,0 @@
-pandas
-numpy
-factor_analyzer
-scikit-learn
-python-dotenv
-requests

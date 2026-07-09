@@ -20,7 +20,7 @@ Danh sách các thư viện Python:
 - `python-dotenv`: Đọc biến môi trường.
 - `requests`: Giao tiếp HTTP với Ollama.
 
-#### [NEW] [.env.example](file:///home/chungdat/HCMUS/2025-2026_HK2/Multivariate%20Statistical%20Analysis/Do%20an/Src/.env.example)
+#### [NEW] `.env`
 File mẫu chứa cấu hình:
 - `OLLAMA_ENDPOINT=http://localhost:11434/api/generate`
 - `OLLAMA_MODEL=llama3`
